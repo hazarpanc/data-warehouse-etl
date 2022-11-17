@@ -17,81 +17,82 @@ time_table_drop = "DROP TABLE IF EXISTS time"
 # SQL QUERIES TO CREATE TABLES
 
 staging_events_table_create= ("""
-CREATE TABLE IF NOT EXISTS "staging_events" (
-  "artist" varchar, "auth" varchar, "firstName" varchar, 
-  "gender" CHAR, "itemInSession" int, 
-  "lastName" varchar, "length" float, "level" varchar, 
-  "location" varchar, "method" varchar, "page" varchar, 
-  "registration" float, 
-  "sessionId" int, "song" varchar, "status" int, 
-  "ts" varchar, "userAgent" varchar, "userId" int
-)
+    CREATE TABLE IF NOT EXISTS "staging_events" (
+      "artist" varchar, "auth" varchar, "firstName" varchar, 
+      "gender" CHAR, "itemInSession" int, 
+      "lastName" varchar, "length" float, 
+      "level" varchar, "location" varchar, 
+      "method" varchar, "page" varchar, 
+      "registration" float, "sessionId" int, 
+      "song" varchar, "status" int, "ts" varchar, 
+      "userAgent" varchar, "userId" int
+    )
 """)
 
 staging_songs_table_create = ("""
-CREATE TABLE IF NOT EXISTS "staging_songs" (
-  "num_songs" int, "artist_id" varchar, 
-  "artist_latitude" float, "artist_longitude" float, 
-  "artist_location" varchar, "artist_name" varchar, 
-  "song_id" varchar, "title" varchar, "duration" float, 
-  "year" int
-)
+    CREATE TABLE IF NOT EXISTS "staging_songs" (
+      "num_songs" int, "artist_id" varchar, 
+      "artist_latitude" float, "artist_longitude" float, 
+      "artist_location" varchar, "artist_name" varchar, 
+      "song_id" varchar, "title" varchar, "duration" float, 
+      "year" int
+    )
 """)
 
 songplay_table_create = ("""
-CREATE TABLE IF NOT EXISTS songplays (
-  songplay_id bigint IDENTITY(0, 1) PRIMARY KEY, 
-  start_time timestamp NOT NULL, 
-  user_id varchar NOT NULL, 
-  level varchar, 
-  song_id varchar, 
-  artist_id varchar, 
-  session_id int, 
-  location varchar, 
-  user_agent varchar
-)
+    CREATE TABLE IF NOT EXISTS songplays (
+      songplay_id bigint IDENTITY(0, 1) PRIMARY KEY, 
+      start_time timestamp NOT NULL, 
+      user_id varchar NOT NULL, 
+      level varchar, 
+      song_id varchar, 
+      artist_id varchar, 
+      session_id int, 
+      location varchar, 
+      user_agent varchar
+    )
 """)
 
 user_table_create = ("""
-CREATE TABLE IF NOT EXISTS users (
-  user_id varchar NOT NULL PRIMARY KEY, 
-  first_name varchar, 
-  last_name varchar, 
-  gender varchar, 
-  level varchar
-)
+    CREATE TABLE IF NOT EXISTS users (
+      user_id varchar NOT NULL PRIMARY KEY, 
+      first_name varchar, 
+      last_name varchar, 
+      gender varchar, 
+      level varchar
+    )
 """)
 
 song_table_create = ("""
-CREATE TABLE IF NOT EXISTS songs (
-  song_id varchar PRIMARY KEY, 
-  title varchar, 
-  artist_id varchar, 
-  year int, 
-  duration float
-)
+    CREATE TABLE IF NOT EXISTS songs (
+      song_id varchar PRIMARY KEY, 
+      title varchar, 
+      artist_id varchar, 
+      year int, 
+      duration float
+    )
 """)
 
 artist_table_create = ("""
-CREATE TABLE IF NOT EXISTS artists (
-  artist_id varchar PRIMARY KEY,
-  name varchar, 
-  location varchar, 
-  latitude float, 
-  longitude float
-)
+    CREATE TABLE IF NOT EXISTS artists (
+      artist_id varchar PRIMARY KEY,
+      name varchar, 
+      location varchar, 
+      latitude float, 
+      longitude float
+    )
 """)
 
 time_table_create = ("""
-CREATE TABLE time (
-  start_time timestamp PRIMARY KEY,
-  hour int, 
-  day int, 
-  week int, 
-  month int, 
-  year int, 
-  weekday int, 
-)
+    CREATE TABLE time (
+      start_time timestamp PRIMARY KEY,
+      hour int, 
+      day int, 
+      week int, 
+      month int, 
+      year int, 
+      weekday int, 
+    )
 """)
 
 # SQL QUERIES TO COPY DATA FROM S3 INTO STAGING TABLES
@@ -115,93 +116,95 @@ staging_songs_copy = ("""
 
 # SQL QUERIES FOR INSERTING DATA FROM STAGING AREA INTO REDSHIFT
 songplay_table_insert = ("""
-INSERT INTO songplay (
-    start_time,
-    user_id,
-    level,
-    song_id,
-    artist_id,
-    session_id,
-    location,
-    user_agent
-) 
-SELECT e.ts as start_time,
-    e.userId as user_id,
-    e.level as level,
-    s.song_id as song_id,
-    s.artist_id as artist_id,
-    e.sessionId as session_id,
-    e.location as location,
-    e.userAgent as user_agent
-FROM staging_events e
-JOIN staging_songs s ON (e.song = s.title AND e.artist = s.artist_name) 
-""")
+    INSERT INTO songplay (
+        start_time,
+        user_id,
+        level,
+        song_id,
+        artist_id,
+        session_id,
+        location,
+        user_agent
+    ) 
+    SELECT e.ts as start_time,
+        e.userId as user_id,
+        e.level as level,
+        s.song_id as song_id,
+        s.artist_id as artist_id,
+        e.sessionId as session_id,
+        e.location as location,
+        e.userAgent as user_agent
+    FROM staging_events e
+    JOIN staging_songs s ON (e.song = s.title AND e.artist = s.artist_name) 
+    WHERE 
+      e.page = 'NextSong'
+    """)
 
 user_table_insert = ("""
-INSERT INTO users (
-    user_id,
-    first_name,
-    last_name,
-    gender,
-    level
-)
-SELECT DISTINCT e.userId as user_id,
-    e.firstName as first_name,
-    e.lastName as last_name,
-    e.gender as gender,
-    e.level as level
-FROM staging_events e
-WHERE user_id IS NOT NULL
-""")
+    INSERT INTO users (
+      user_id, first_name, last_name, gender, 
+      level
+    ) 
+    SELECT 
+      DISTINCT user_id, 
+      firstname, 
+      lastname, 
+      gender, 
+      level 
+    FROM 
+      staging_events 
+    WHERE 
+      page = 'NextSong'
+    """)
 
 song_table_insert = ("""
-INSERT INTO song (
-    song_id,
-    title,
-    artist_id,
-    year,
-    duration
-)
-SELECT DISTINCT s.song_id as song_id,
-    s.title as title,
-    s.artist_id as artist_id,
-    s.year as year,
-    s.duration as duration
-FROM staging_songs s
-""")
+    INSERT INTO song (
+        song_id,
+        title,
+        artist_id,
+        year,
+        duration
+    )
+    SELECT DISTINCT s.song_id as song_id,
+        s.title as title,
+        s.artist_id as artist_id,
+        s.year as year,
+        s.duration as duration
+    FROM staging_songs s
+    """)
 
 artist_table_insert = ("""
-INSERT INTO artist (
-    artist_id,
-    name,
-    location,
-    latitude,
-    longitude
-)
-SELECT DISTINCT s.artist_id as artist_id,
-    s.artist_name as name,
-    s.artist_location as location,
-    s.artist_latitude as latitude,
-    s.artist_longitude as longitude
-FROM staging_songs s
-""")
+    INSERT INTO artist (
+        artist_id,
+        name,
+        location,
+        latitude,
+        longitude
+    )
+    SELECT DISTINCT s.artist_id as artist_id,
+        s.artist_name as name,
+        s.artist_location as location,
+        s.artist_latitude as latitude,
+        s.artist_longitude as longitude
+    FROM staging_songs s
+    """)
 
 time_table_insert = ("""
-INSERT INTO time
-(start_time, hour, day, week, month, year, weekday)
-SELECT t.start_time
-    , EXTRACT(hour FROM t.start_time)
-    , EXTRACT(day FROM t.start_time)
-    , EXTRACT(week FROM t.start_time)
-    , EXTRACT(month FROM t.start_time)
-    , EXTRACT(year FROM t.start_time)
-    , EXTRACT(weekday FROM t.start_time)        
-FROM (
-    SELECT DISTINCT TIMESTAMP 'epoch' + (ts/1000)::BIGINT 
-        * INTERVAL '1 second' AS start_time
-    FROM staging_events
-) AS t;
-""")
+    INSERT INTO time
+    (start_time, hour, day, week, month, year, weekday)
+    SELECT t.start_time
+        , EXTRACT(hour FROM t.start_time)
+        , EXTRACT(day FROM t.start_time)
+        , EXTRACT(week FROM t.start_time)
+        , EXTRACT(month FROM t.start_time)
+        , EXTRACT(year FROM t.start_time)
+        , EXTRACT(weekday FROM t.start_time)        
+    FROM (
+        SELECT DISTINCT TIMESTAMP 'epoch' + (ts/1000)::BIGINT 
+            * INTERVAL '1 second' AS start_time
+        FROM staging_events
+    ) AS t;
+    """)
 
 
 # QUERY LISTS
