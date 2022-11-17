@@ -8,7 +8,7 @@ config.read('dwh.cfg')
 
 staging_events_table_drop = "DROP TABLE IF EXISTS staging_events"
 staging_songs_table_drop = "DROP TABLE IF EXISTS staging_songs"
-songplay_table_drop = "DROP TABLE IF EXISTS songplay"
+songplay_table_drop = "DROP TABLE IF EXISTS songplays"
 user_table_drop = "DROP TABLE IF EXISTS users"
 song_table_drop = "DROP TABLE IF EXISTS song"
 artist_table_drop = "DROP TABLE IF EXISTS artist"
@@ -17,26 +17,43 @@ time_table_drop = "DROP TABLE IF EXISTS time"
 # SQL QUERIES TO CREATE TABLES
 
 staging_events_table_create= ("""
-    CREATE TABLE IF NOT EXISTS "staging_events" (
-      "artist" varchar, "auth" varchar, "firstName" varchar, 
-      "gender" CHAR, "itemInSession" int, 
-      "lastName" varchar, "length" float, 
-      "level" varchar, "location" varchar, 
-      "method" varchar, "page" varchar, 
-      "registration" float, "sessionId" int, 
-      "song" varchar, "status" int, "ts" varchar, 
-      "userAgent" varchar, "userId" int
-    )
+    CREATE TABLE IF NOT EXISTS staging_events (
+      artist varchar(256), 
+      auth varchar(256), 
+      firstName varchar(256), 
+      gender char, 
+      itemInSession int, 
+      lastName varchar(256), 
+      length float, 
+      level varchar(256), 
+      location varchar(256), 
+      method varchar(256), 
+      page varchar(256), 
+      registration float, 
+      sessionId int, 
+      song varchar(256), 
+      status int, 
+      ts varchar, 
+      userAgent varchar(256), 
+      userId varchar(256)
+    );
+
 """)
 
 staging_songs_table_create = ("""
-    CREATE TABLE IF NOT EXISTS "staging_songs" (
-      "num_songs" int, "artist_id" varchar, 
-      "artist_latitude" float, "artist_longitude" float, 
-      "artist_location" varchar, "artist_name" varchar, 
-      "song_id" varchar, "title" varchar, "duration" float, 
-      "year" int
+    CREATE TABLE IF NOT EXISTS staging_songs (
+      num_songs int, 
+      artist_id varchar, 
+      artist_latitude float, 
+      artist_longitude float, 
+      artist_location varchar, 
+      artist_name varchar, 
+      song_id varchar, 
+      title varchar, 
+      duration float, 
+      year int
     )
+
 """)
 
 songplay_table_create = ("""
@@ -84,15 +101,15 @@ artist_table_create = ("""
 """)
 
 time_table_create = ("""
-    CREATE TABLE time (
-      start_time timestamp PRIMARY KEY,
-      hour int, 
-      day int, 
-      week int, 
-      month int, 
-      year int, 
-      weekday int, 
-    )
+    CREATE TABLE IF NOT EXISTS time (
+        start_time  timestamp PRIMARY KEY SORTKEY,
+        hour        int,
+        day         int,
+        week        int,
+        month       int,
+        year        int DISTKEY,
+        weekday     int
+    ) diststyle key;
 """)
 
 # SQL QUERIES TO COPY DATA FROM S3 INTO STAGING TABLES
@@ -116,7 +133,7 @@ staging_songs_copy = ("""
 
 # SQL QUERIES FOR INSERTING DATA FROM STAGING AREA INTO REDSHIFT
 songplay_table_insert = ("""
-    INSERT INTO songplay (
+    INSERT INTO songplays (
         start_time,
         user_id,
         level,
