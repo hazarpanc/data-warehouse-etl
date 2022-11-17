@@ -114,20 +114,23 @@ time_table_create = ("""
 
 # SQL QUERIES TO COPY DATA FROM S3 INTO STAGING TABLES
 staging_events_copy = ("""
-    COPY staging_events
-    FROM {}
-    CREDENTIALS {}
-    REGION 'us-west-2'
-    FORMAT AS JSON {};    
-""").format(config.get('S3','LOG_DATA'), config.get('IAM_ROLE','ARN'), config.get('S3','LOG_JSONPATH'))
+    COPY staging_events FROM {}
+    IAM_ROLE {}
+    JSON {} region 'us-west-2';
+""").format(
+    config['S3']['LOG_DATA'],
+    config['IAM_ROLE']['ARN'],
+    config['S3']['LOG_JSONPATH']
+)
 
 staging_songs_copy = ("""
-    COPY staging_songs 
-    FROM {}
-    CREDENTIALS {}
-    REGION 'us-west-2'
-    JSON 'auto';
-""").format(config.get('S3','SONG_DATA'), config.get('IAM_ROLE','ARN'))
+    COPY staging_songs FROM {}
+    IAM_ROLE {}
+    JSON 'auto' region 'us-west-2';
+""").format(
+    config['S3']['SONG_DATA'],
+    config['IAM_ROLE']['ARN']
+)
 
 
 
