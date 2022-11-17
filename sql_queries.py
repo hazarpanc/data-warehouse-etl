@@ -33,7 +33,7 @@ staging_events_table_create= ("""
       sessionId int, 
       song varchar(256), 
       status int, 
-      ts varchar, 
+      ts bigint, 
       userAgent varchar(256), 
       userId varchar(256)
     );
@@ -59,7 +59,7 @@ staging_songs_table_create = ("""
 songplay_table_create = ("""
     CREATE TABLE IF NOT EXISTS songplays (
       songplay_id bigint IDENTITY(0, 1) PRIMARY KEY, 
-      start_time timestamp NOT NULL, 
+      start_time varchar NOT NULL, 
       user_id varchar NOT NULL, 
       level varchar, 
       song_id varchar, 
@@ -102,63 +102,58 @@ artist_table_create = ("""
 
 time_table_create = ("""
     CREATE TABLE IF NOT EXISTS time (
-        start_time  timestamp PRIMARY KEY SORTKEY,
-        hour        int,
-        day         int,
-        week        int,
-        month       int,
-        year        int DISTKEY,
-        weekday     int
+      start_time timestamp PRIMARY KEY SORTKEY, 
+      hour int, 
+      day int, 
+      week int, 
+      month int, 
+      year int DISTKEY, 
+      weekday int
     ) diststyle key;
+
 """)
 
 # SQL QUERIES TO COPY DATA FROM S3 INTO STAGING TABLES
 staging_events_copy = ("""
     COPY staging_events FROM {}
     IAM_ROLE {}
-    JSON {} region 'us-west-2';
+    JSON {} region '{}';
 """).format(
     config['S3']['LOG_DATA'],
     config['IAM_ROLE']['ARN'],
-    config['S3']['LOG_JSONPATH']
+    config['S3']['LOG_JSONPATH'],
+    config['CLUSTER']['REGION']
 )
 
 staging_songs_copy = ("""
     COPY staging_songs FROM {}
     IAM_ROLE {}
-    JSON 'auto' region 'us-west-2';
+    JSON 'auto' region '{}';
 """).format(
     config['S3']['SONG_DATA'],
-    config['IAM_ROLE']['ARN']
+    config['IAM_ROLE']['ARN'],
+    config['CLUSTER']['REGION']
 )
-
 
 
 # SQL QUERIES FOR INSERTING DATA FROM STAGING AREA INTO REDSHIFT
 songplay_table_insert = ("""
-    INSERT INTO songplays (
-        start_time,
-        user_id,
-        level,
-        song_id,
-        artist_id,
-        session_id,
-        location,
-        user_agent
-    ) 
-    SELECT e.ts as start_time,
-        e.userId as user_id,
-        e.level as level,
-        s.song_id as song_id,
-        s.artist_id as artist_id,
-        e.sessionId as session_id,
-        e.location as location,
-        e.userAgent as user_agent
-    FROM staging_events e
-    JOIN staging_songs s ON (e.song = s.title AND e.artist = s.artist_name) 
-    WHERE 
-      e.page = 'NextSong'
-    """)
+    INSERT INTO songplays (start_time, user_id, level, song_id, artist_id, session_id, location, user_agent)
+    SELECT  se.ts,
+            se.userId,
+            se.level,
+            s.song_id,
+            s.artist_id,
+            se.sessionId,
+            se.location,
+            se.userAgent
+    FROM staging_songs s
+    JOIN staging_events se
+    ON s.artist_name = se.artist
+    AND s.title = se.song
+    AND s.duration = se.length
+    WHERE se.page = 'NextSong';
+""")
 
 user_table_insert = ("""
     INSERT INTO users (
@@ -166,7 +161,7 @@ user_table_insert = ("""
       level
     ) 
     SELECT 
-      DISTINCT user_id, 
+      DISTINCT userId, 
       firstname, 
       lastname, 
       gender, 
@@ -178,7 +173,7 @@ user_table_insert = ("""
     """)
 
 song_table_insert = ("""
-    INSERT INTO song (
+    INSERT INTO songs (
         song_id,
         title,
         artist_id,
@@ -194,7 +189,7 @@ song_table_insert = ("""
     """)
 
 artist_table_insert = ("""
-    INSERT INTO artist (
+    INSERT INTO artists (
         artist_id,
         name,
         location,
@@ -210,21 +205,20 @@ artist_table_insert = ("""
     """)
 
 time_table_insert = ("""
-    INSERT INTO time
-    (start_time, hour, day, week, month, year, weekday)
-    SELECT t.start_time
-        , EXTRACT(hour FROM t.start_time)
-        , EXTRACT(day FROM t.start_time)
-        , EXTRACT(week FROM t.start_time)
-        , EXTRACT(month FROM t.start_time)
-        , EXTRACT(year FROM t.start_time)
-        , EXTRACT(weekday FROM t.start_time)        
-    FROM (
-        SELECT DISTINCT TIMESTAMP 'epoch' + (ts/1000)::BIGINT 
-            * INTERVAL '1 second' AS start_time
-        FROM staging_events
-    ) AS t;
-    """)
+    INSERT INTO time (
+        start_time, hour, day, week, month, year, weekday
+    ) 
+    SELECT DISTINCT(
+        DATEADD(s, ts / 1000, '19700101')
+    ) AS start_time,
+    EXTRACT(hour from start_time) AS hour,
+    EXTRACT(day from start_time) AS day,
+    EXTRACT(week from start_time) AS week,
+    EXTRACT(month from start_time) AS month,
+    EXTRACT(year from start_time) AS year,
+    EXTRACT(weekday from start_time) AS weekday
+    FROM staging_events
+""")
 
 
 # QUERY LISTS
